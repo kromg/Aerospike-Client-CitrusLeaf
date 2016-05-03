@@ -21,6 +21,28 @@ use perl_citrusleaf;
 
 use File::Spec;
 
+
+# ------------------------------------------------------------------------------
+#  Internal configurations
+# ------------------------------------------------------------------------------
+# Getters and setters names
+my @attributes = (qw(
+    asc
+    host
+    port
+    conn_timeout
+    read_timeout
+    connected
+    ns
+    set
+));
+
+
+
+
+# ------------------------------------------------------------------------------
+#  citrusleaf::citrusleaf_init()
+# ------------------------------------------------------------------------------
 BEGIN {
     # citrusleaf_init() prints client version, redirect it to null
     my $orig = *STDERR;
@@ -34,33 +56,34 @@ BEGIN {
 }
 
 
+
+
 # ------------------------------------------------------------------------------
-#  Esported constants
+#  Private methods
 # ------------------------------------------------------------------------------
-use constant        CL_INT      => citrusleaf::CL_INT;
-use constant        CL_STR      => citrusleaf::CL_STR;
-use constant        CL_BLOB     => citrusleaf::CL_BLOB;
+
+sub _cl_wp {
+    my ($self, $wp) = @_;
+
+    my $cl_wp = undef;
+    if ($wp && ref( $wp ) && ref( $wp ) eq 'HASH') {
+        $cl_wp = new citrusleaf::cl_write_parameters();
+        citrusleaf::cl_write_parameters_set_default($cl_wp);
+        while (my ($param, $value) = each %$wp) {
+            $cl_wp->{$param} = $value;
+        }
+    }
+
+    return $cl_wp;
+
+}
 
 
-use parent qw(Exporter);
-our @EXPORT_OK = (qw(
-    CL_INT
-    CL_STR
-    CL_BLOB
-    ));
 
-# Getters and setters names
-my @attributes = (qw(
-    asc
-    host
-    port
-    conn_timeout
-    read_timeout
-    connected
-    ns
-    set
-));
 
+# ------------------------------------------------------------------------------
+#  Public methods
+# ------------------------------------------------------------------------------
 
 sub new {
     my $class = shift;
@@ -125,30 +148,6 @@ sub DESTROY {
     citrusleaf::citrusleaf_shutdown();
 }
 
-
-sub _cleanup {
-    my ($self, $bins, $number_bins, $bins_get_all, $size, $generation) = @_;
-    citrusleaf::citrusleaf_free_bins($bins, $number_bins, $bins_get_all);
-    citrusleaf::delete_intp($size);
-    citrusleaf::delete_intp($generation);
-    citrusleaf::delete_cl_bin_p($bins_get_all);
-}
-
-sub _cl_wp {
-    my ($self, $wp) = @_;
-
-    my $cl_wp = undef;
-    if ($wp && ref( $wp ) && ref( $wp ) eq 'HASH') {
-        $cl_wp = new citrusleaf::cl_write_parameters();
-        citrusleaf::cl_write_parameters_set_default($cl_wp);
-        while (my ($param, $value) = each %$wp) {
-            $cl_wp->{$param} = $value;
-        }
-    }
-
-    return $cl_wp;
-
-}
 
 
 sub write {
@@ -340,6 +339,60 @@ sub delete_from {
         unless $rv == citrusleaf::CITRUSLEAF_OK;
 }
 
+
+
+sub operate {
+    my $self = shift;
+    
+    $self->ns() && $self->set()
+        or croak "Default namespace and set are not defined.";
+
+    $self->operate_onto(
+        $self->ns(), 
+        $self->set(),
+        @_,
+    );
+}
+
+sub operate_onto {
+    my ($self, $ns, $set, $key, $data, $wp, $replace) = @_;
+
+    # set up the key.
+    $key_obj = citrusleaf::cl_object();
+    citrusleaf::citrusleaf_object_init_str($key_obj, $key);
+
+    $gen_count = citrusleaf::new_intp();
+
+    my $ndata = ~~@$data;
+    $ops = citrusleaf::cl_op_arr($ndata);
+
+    for (my $idx = 0; $idx < $ndata; ++$idx) {
+        my $op = $ops->getitem( $idx );
+        $op->{bin}->{bin_name} = $data->[$idx]->{name};
+        $op->{op} = $data->[$idx]->{op};    # TODO: export citrusleaf operation or tell user she must import them manually
+
+
+        for my $type ($data->[$idx]->{type}) {
+            if      ($type == citrusleaf::CL_STR) {
+                citrusleaf::citrusleaf_object_init_str($op->{bin}->{object}, $data->[$idx]->{data});
+            } elsif ($type == citrusleaf::CL_BLOB) {
+                citrusleaf::citrusleaf_object_init_blob($op->{bin}->{object}, $data->[$idx]->{data}, length( $data->[$idx]->{data} ));
+            } elsif ($type == citrusleaf::CL_INT) {
+                citrusleaf::citrusleaf_object_init_int($op->{bin}->{object}, $data->[$idx]->{data} + 0);    # Force Perl to give us a number
+            } else {
+                croak "Invalid cl_object type: $type";
+            }
+        }
+        $ops->setitem($idx,$op);
+    }
+
+    # Write params, if any
+    my $cl_wp = $self->_cl_wp( $wp );
+        
+    # the operate call does all
+    citrusleaf::citrusleaf_operate($self->asc(), $ns, $set, $key_obj, $ops, $ndata, $cl_wp, $replace, $gen_count);
+
+}
 
 
 
