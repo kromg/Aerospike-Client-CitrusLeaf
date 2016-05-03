@@ -1,11 +1,74 @@
 NAME
 
     Aerospike::Client::CitrusLeaf - Aerospike OO client based on citrusleaf
-    client
 
 VERSION
 
-    version v0.01.00
+    version 0.01.10
+
+SYNOPSIS
+
+    See SAMPLE USAGE
+
+CAVEATS
+
+    This thing is a work in progress. Interface may change without warning.
+
+SAMPLE USAGE
+
+            #!/usr/bin/perl
+    
+            use strict;
+            use warnings;
+            use v5.010.001;
+            use utf8;
+    
+            use citrusleaf;
+            use Aerospike::Client::CitrusLeaf;
+            use Data::Dumper;
+    
+    
+            my $a = Aerospike::Client::CitrusLeaf->new(
+                host         => '192.168.100.157',
+                ns           => 'test',
+                set          => 'testset',
+                conn_timeout => 10
+            );
+    
+            my $b = Aerospike::Client::CitrusLeaf->new(
+                host         => '192.168.100.239',
+                ns           => 'test',
+                set          => 'testset',
+                conn_timeout => 10
+            );
+    
+            $a->connect();
+            $b->connect();
+    
+            $a->write(
+                "testkey",
+                [
+                    { name => 'bin1', data => 'a string', type => citrusleaf::CL_STR },
+                    { name => 'bin2', data => 1,          type => citrusleaf::CL_INT },
+                ]
+            );
+    
+            $b->write(
+                "testkey2",
+                [
+                    { name => 'bin1', data => 'another string', type => citrusleaf::CL_STR },
+                    { name => 'bin2', data => 2,                type => citrusleaf::CL_INT },
+                ]
+            );
+    
+            say Data::Dumper->Dump( [ $a->read("testkey") ] );
+            say Data::Dumper->Dump( [ $b->read("testkey2") ] );
+    
+            $a->delete( "testkey" );
+            $b->delete( "testkey2" );
+    
+            $a->close();
+            $b->close();
 
 AUTHOR
 

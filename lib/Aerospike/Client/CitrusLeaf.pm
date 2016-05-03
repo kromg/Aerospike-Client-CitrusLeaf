@@ -6,7 +6,7 @@ package Aerospike::Client::CitrusLeaf;
 
 =cut
 
-# ABSTRACT: Aerospike OO client based on citrusleaf client
+# ABSTRACT: Aerospike OO client based on citrusleaf
 
 use v5.010.001;
 use strict;
@@ -14,12 +14,13 @@ use warnings;
 use Carp;
 use utf8;
 
-use version; our $VERSION = qv(0.01.00);
+our $VERSION = '0.01.10';
 
 use citrusleaf;
 use perl_citrusleaf;
 
 use File::Spec;
+
 
 
 # ------------------------------------------------------------------------------
@@ -45,14 +46,16 @@ my @attributes = (qw(
 # ------------------------------------------------------------------------------
 BEGIN {
     # citrusleaf_init() prints client version, redirect it to null
-    my $orig = *STDERR;
-    open( STDERR, ">", File::Spec->devnull ) 
+	# Save STDERR
+    open( my $orig, ">&", \*STDERR ) or croak "Can't dup STDERR: $!";
+    open( STDERR, ">", File::Spec->devnull )
         or croak "Couldn't open null device";
 
     # Initialize citrusleaf once
     citrusleaf::citrusleaf_init();
 
-    *STDERR = $orig;
+    open( STDERR, ">&", $orig ) or croak "Can't restore STDERR: $!";
+	close( $orig );
 }
 
 
@@ -85,13 +88,19 @@ sub _cl_wp {
 #  Public methods
 # ------------------------------------------------------------------------------
 
+=head1 SYNOPSIS
+
+See SAMPLE USAGE
+
+=cut
+
 sub new {
     my $class = shift;
 
     # Boilerplate
     ref($class) && croak "new() is a static method, you must call it on ".__PACKAGE__;
 
-    my %args = 
+    my %args =
         ref($_[0])     ?
             %{ $_[0] } :
             @_;
@@ -120,7 +129,7 @@ sub connect {
     my ($self) = @_;
 
     unless ($self->connected()) {
-        citrusleaf::citrusleaf_cluster_add_host( 
+        citrusleaf::citrusleaf_cluster_add_host(
             $self->asc(),
             $self->host(),
             $self->port(),
@@ -152,12 +161,12 @@ sub DESTROY {
 
 sub write {
     my $self = shift;
-    
+
     $self->ns() && $self->set()
         or croak "Default namespace and set are not defined.";
 
     $self->write_to(
-        $self->ns(), 
+        $self->ns(),
         $self->set(),
         @_,
     );
@@ -178,7 +187,7 @@ sub write_to {
     # Initializing bin of type string
     for (my $idx =0; $idx < $ndata; ++$idx) {
         my $b = $bins->getitem( $idx );
-        $b->{bin_name} = $data->[$idx]->{name}; 
+        $b->{bin_name} = $data->[$idx]->{name};
 
         for my $type ($data->[$idx]->{type}) {
             if      ($type == citrusleaf::CL_STR) {
@@ -197,18 +206,18 @@ sub write_to {
 
 
     my $cl_wp = $self->_cl_wp( $wp );
-    
+
 
     my $rv = citrusleaf::citrusleaf_put(
-        $self->asc(), 
-        $ns, 
+        $self->asc(),
+        $ns,
         $set,
-        $key_obj, 
-        $bins, 
+        $key_obj,
+        $bins,
         $ndata,
         $cl_wp
     );
-    if ($rv != citrusleaf::CITRUSLEAF_OK ) { 
+    if ($rv != citrusleaf::CITRUSLEAF_OK ) {
        croak "Failure setting values ", $rv;
     }
 
@@ -243,17 +252,17 @@ sub read_from {
     my $bins_get_all = citrusleaf::new_cl_bin_p();
 
     my $rv = citrusleaf::citrusleaf_get_all(
-        $self->asc(), 
-        $ns, 
-        $set, 
-        $key_obj, 
-        $bins_get_all , 
-        $size, 
+        $self->asc(),
+        $ns,
+        $set,
+        $key_obj,
+        $bins_get_all ,
+        $size,
         $self->read_timeout(),
         $generation
     );
 
-    croak "Read failed: $rv" 
+    croak "Read failed: $rv"
         unless $rv == citrusleaf::CITRUSLEAF_OK;
 
     # Number of bins returned
@@ -264,7 +273,7 @@ sub read_from {
 
     # Printing value received
     my @bins;
-    for (my $i=0; $i < $number_bins; $i++) { 
+    for (my $i=0; $i < $number_bins; $i++) {
         my %bininfo;
         my $bin = $bins->getitem($i);
 
@@ -335,7 +344,7 @@ sub delete_from {
         $cl_wp,
     );
 
-    croak "Delete failed: $rv" 
+    croak "Delete failed: $rv"
         unless $rv == citrusleaf::CITRUSLEAF_OK;
 }
 
@@ -343,12 +352,12 @@ sub delete_from {
 
 sub operate {
     my $self = shift;
-    
+
     $self->ns() && $self->set()
         or croak "Default namespace and set are not defined.";
 
     $self->operate_onto(
-        $self->ns(), 
+        $self->ns(),
         $self->set(),
         @_,
     );
@@ -358,13 +367,13 @@ sub operate_onto {
     my ($self, $ns, $set, $key, $data, $wp, $replace) = @_;
 
     # set up the key.
-    $key_obj = citrusleaf::cl_object();
+    my $key_obj = citrusleaf::cl_object();
     citrusleaf::citrusleaf_object_init_str($key_obj, $key);
 
-    $gen_count = citrusleaf::new_intp();
+    my $gen_count = citrusleaf::new_intp();
 
     my $ndata = ~~@$data;
-    $ops = citrusleaf::cl_op_arr($ndata);
+    my $ops = citrusleaf::cl_op_arr($ndata);
 
     for (my $idx = 0; $idx < $ndata; ++$idx) {
         my $op = $ops->getitem( $idx );
@@ -388,7 +397,7 @@ sub operate_onto {
 
     # Write params, if any
     my $cl_wp = $self->_cl_wp( $wp );
-        
+
     # the operate call does all
     citrusleaf::citrusleaf_operate($self->asc(), $ns, $set, $key_obj, $ops, $ndata, $cl_wp, $replace, $gen_count);
 
@@ -422,6 +431,70 @@ for my $attr (@attributes) {
     }
 }
 
+
+=head1 CAVEATS
+
+This thing is a work in progress. Interface may change without warning.
+
+=head1 SAMPLE USAGE
+
+	#!/usr/bin/perl
+
+	use strict;
+	use warnings;
+	use v5.010.001;
+	use utf8;
+
+	use citrusleaf;
+	use Aerospike::Client::CitrusLeaf;
+	use Data::Dumper;
+
+
+	my $a = Aerospike::Client::CitrusLeaf->new(
+	    host         => '192.168.100.157',
+	    ns           => 'test',
+	    set          => 'testset',
+	    conn_timeout => 10
+	);
+
+	my $b = Aerospike::Client::CitrusLeaf->new(
+	    host         => '192.168.100.239',
+	    ns           => 'test',
+	    set          => 'testset',
+	    conn_timeout => 10
+	);
+
+	$a->connect();
+	$b->connect();
+
+	$a->write(
+	    "testkey",
+	    [
+	        { name => 'bin1', data => 'a string', type => citrusleaf::CL_STR },
+	        { name => 'bin2', data => 1,          type => citrusleaf::CL_INT },
+	    ]
+	);
+
+	$b->write(
+	    "testkey2",
+	    [
+	        { name => 'bin1', data => 'another string', type => citrusleaf::CL_STR },
+	        { name => 'bin2', data => 2,                type => citrusleaf::CL_INT },
+	    ]
+	);
+
+	say Data::Dumper->Dump( [ $a->read("testkey") ] );
+	say Data::Dumper->Dump( [ $b->read("testkey2") ] );
+
+	$a->delete( "testkey" );
+	$b->delete( "testkey2" );
+
+	$a->close();
+	$b->close();
+
+
+
+=cut
 
 
 
