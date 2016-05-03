@@ -4,7 +4,7 @@ NAME
 
 VERSION
 
-    version 0.01.10
+    version 0.01.11
 
 SYNOPSIS
 
@@ -60,6 +60,32 @@ SAMPLE USAGE
                     { name => 'bin2', data => 2,                type => citrusleaf::CL_INT },
                 ]
             );
+    
+            say Data::Dumper->Dump( [ $a->read("testkey") ] );
+            say Data::Dumper->Dump( [ $b->read("testkey2") ] );
+    
+    
+    
+    
+            my $write_params = undef;
+            $a->operate(
+                "testkey",
+                [
+                    { name => 'bin2', data => 2, type => citrusleaf::CL_INT, op => citrusleaf::CL_OP_INCR, },
+                ],
+                $write_params,
+            );
+    
+    
+            $b->operate(
+                "testkey2",
+                [
+                    { name => 'bin1', data => "just ", type => citrusleaf::CL_STR, op => citrusleaf::CL_OP_MC_PREPEND, },
+                    { name => 'bin3', data => 2, type => citrusleaf::CL_INT, op => citrusleaf::CL_OP_WRITE, },
+                ],
+                $write_params,
+            );
+    
     
             say Data::Dumper->Dump( [ $a->read("testkey") ] );
             say Data::Dumper->Dump( [ $b->read("testkey2") ] );

@@ -14,7 +14,7 @@ use warnings;
 use Carp;
 use utf8;
 
-our $VERSION = '0.01.10';
+our $VERSION = '0.01.11';
 
 use citrusleaf;
 use perl_citrusleaf;
@@ -364,16 +364,16 @@ sub operate {
 }
 
 sub operate_onto {
-    my ($self, $ns, $set, $key, $data, $wp, $replace) = @_;
+    my ($self, $ns, $set, $key, $data, $wp) = @_;
 
     # set up the key.
-    my $key_obj = citrusleaf::cl_object();
+    my $key_obj = new citrusleaf::cl_object();
     citrusleaf::citrusleaf_object_init_str($key_obj, $key);
 
     my $gen_count = citrusleaf::new_intp();
 
     my $ndata = ~~@$data;
-    my $ops = citrusleaf::cl_op_arr($ndata);
+    my $ops = new citrusleaf::cl_op_arr($ndata);
 
     for (my $idx = 0; $idx < $ndata; ++$idx) {
         my $op = $ops->getitem( $idx );
@@ -399,7 +399,7 @@ sub operate_onto {
     my $cl_wp = $self->_cl_wp( $wp );
 
     # the operate call does all
-    citrusleaf::citrusleaf_operate($self->asc(), $ns, $set, $key_obj, $ops, $ndata, $cl_wp, $replace, $gen_count);
+    citrusleaf::citrusleaf_operate($self->asc(), $ns, $set, $key_obj, $ops, $ndata, $cl_wp, 0, $gen_count);
 
 }
 
@@ -486,11 +486,39 @@ This thing is a work in progress. Interface may change without warning.
 	say Data::Dumper->Dump( [ $a->read("testkey") ] );
 	say Data::Dumper->Dump( [ $b->read("testkey2") ] );
 
+
+
+
+	my $write_params = undef;
+	$a->operate(
+	    "testkey",
+	    [
+	        { name => 'bin2', data => 2, type => citrusleaf::CL_INT, op => citrusleaf::CL_OP_INCR, },
+	    ],
+	    $write_params,
+	);
+
+
+	$b->operate(
+	    "testkey2",
+	    [
+	        { name => 'bin1', data => "just ", type => citrusleaf::CL_STR, op => citrusleaf::CL_OP_MC_PREPEND, },
+	        { name => 'bin3', data => 2, type => citrusleaf::CL_INT, op => citrusleaf::CL_OP_WRITE, },
+	    ],
+	    $write_params,
+	);
+
+
+	say Data::Dumper->Dump( [ $a->read("testkey") ] );
+	say Data::Dumper->Dump( [ $b->read("testkey2") ] );
+
 	$a->delete( "testkey" );
 	$b->delete( "testkey2" );
 
 	$a->close();
 	$b->close();
+
+
 
 
 
