@@ -1,5 +1,7 @@
 use Test::More tests => 2;
 
+use lib "./t";
+
 use Aerospike::Client::CitrusLeaf;
 SKIP: {
 

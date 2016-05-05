@@ -14,7 +14,7 @@ use warnings;
 use Carp;
 use utf8;
 
-our $VERSION = '0.01.11';
+our $VERSION = '0.01.12';
 
 use citrusleaf;
 use perl_citrusleaf;
